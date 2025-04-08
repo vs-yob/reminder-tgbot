@@ -33,18 +33,24 @@ cd reminder-tgbot
 2. Create a `.env` file with the following content:
 ```
 BOT_TOKEN=your_bot_token_here
-REDIS_HOST=redis
+REDIS_HOST=host.docker.internal
 REDIS_PORT=6379
 REDIS_DB=0
 TIMEZONE=UTC
 ```
 
-3. Run the application with Docker Compose:
+3. Make sure you have Redis running in Docker:
+```bash
+# Check if Redis is running
+docker ps | grep redis
+```
+
+4. Run the application with Docker Compose:
 ```bash
 docker-compose up -d
 ```
 
-4. Check the logs:
+5. Check the logs:
 ```bash
 docker-compose logs -f bot
 ```
