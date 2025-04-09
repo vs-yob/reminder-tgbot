@@ -2,29 +2,19 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.jobstores.redis import RedisJobStore
-from dotenv import load_dotenv
 from tortoise import Tortoise
-import os
 import redis.asyncio as redis
+from bot.middlewares.scheduler_middleware import SchedulerMiddleware
+from db.config import redis_settings
+from bot.handlers.handlers import router
+from bot.utils.get_bot import get_bot, get_scheduler
 
-from db.config import TORTOISE_ORM, RedisSettings
-from db.models.models import User, Reminder
-from bot.handlers.handlers import router, scheduler
-from scheduler.scheduler import ReminderScheduler
-
-# Load environment variables
-load_dotenv()
-
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
 async def main():
     # Initialize Redis
-    redis_settings = RedisSettings()
     redis_client = redis.Redis(
         host=redis_settings.REDIS_HOST,
         port=redis_settings.REDIS_PORT,
@@ -33,33 +23,36 @@ async def main():
     )
     
     # Initialize bot and dispatcher with Redis storage
-    bot = Bot(token=os.getenv("BOT_TOKEN"))
+    
     storage = RedisStorage(redis=redis_client)
     dp = Dispatcher(storage=storage)
     
     # Initialize scheduler with Redis job store
-    jobstores = {
-        'default': RedisJobStore(
-            host=redis_settings.REDIS_HOST,
-            port=redis_settings.REDIS_PORT,
-            db=redis_settings.REDIS_DB
-        )
-    }
+
     
     # Initialize scheduler
-    global scheduler
-    scheduler = ReminderScheduler(bot, jobstores=jobstores)
+    scheduler = get_scheduler()
     
     # Initialize database
-    await Tortoise.init(config=TORTOISE_ORM)
-    await Tortoise.generate_schemas()
+    await Tortoise.init(
+        db_url="sqlite:///db.sqlite3",
+        _create_db=True,
+        use_tz=True, 
+        timezone=redis_settings.TIMEZONE, 
+        modules={"models": ["db.models.models"]},
+        
+    )
+    await Tortoise.generate_schemas(safe=True)
     
     # Start scheduler
     await scheduler.start()
-    
+    scheduler_middleware = SchedulerMiddleware(scheduler)
+    router.message.middleware(scheduler_middleware)
+    router.callback_query.middleware(scheduler_middleware)
     # Register handlers
     dp.include_router(router)
     
+    bot = get_bot()
     # Start polling
     try:
         await dp.start_polling(bot)

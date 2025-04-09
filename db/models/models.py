@@ -24,7 +24,7 @@ class Reminder(models.Model):
     id = fields.IntField(pk=True)
     user = fields.ForeignKeyField("models.User", related_name="reminders")
     text = fields.TextField()
-    remind_at = fields.DatetimeField()
+    remind_at = fields.DatetimeField(null=True, default=None)
     repeat = fields.CharEnumField(RepeatType, default=RepeatType.NONE)
     is_active = fields.BooleanField(default=True)
     created_at = fields.DatetimeField(auto_now_add=True)

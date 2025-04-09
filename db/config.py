@@ -1,41 +1,20 @@
 import os
 from typing import List
-from pydantic_settings import BaseSettings
+from pydantic import BaseModel
 
 
-class RedisSettings(BaseSettings):
+class RedisSettings(BaseModel):
     REDIS_HOST: str
     REDIS_PORT: int
     REDIS_DB: int
-
-    class Config:
-        env_file = ".env"
-
-
-class DatabaseSettings(BaseSettings):
-    DB_HOST: str
-    DB_PORT: int
-    DB_NAME: str
-    DB_USER: str
-    DB_PASSWORD: str
-
-    @property
-    def database_url(self) -> str:
-        return f"postgres://{self.DB_USER}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_NAME}"
-
-    class Config:
-        env_file = ".env"
+    BOT_TOKEN: str
+    TIMEZONE: str = "UTC"
 
 
-# Конфигурация Tortoise ORM для SQLite
-TORTOISE_ORM = {
-    "connections": {"default": "sqlite:///data/db.sqlite3"},
-    "apps": {
-        "models": {
-            "models": ["db.models.models", "aerich.models"],
-            "default_connection": "default",
-        },
-    },
-    "use_tz": True,
-    "timezone": "UTC"
-} 
+redis_settings = RedisSettings(
+    REDIS_HOST=os.getenv("REDIS_HOST"),  # type: ignore
+    REDIS_PORT=os.getenv("REDIS_PORT"),  # type: ignore
+    REDIS_DB=os.getenv("REDIS_DB"),  # type: ignore
+    BOT_TOKEN=os.getenv("BOT_TOKEN"),  # type: ignore
+)
+

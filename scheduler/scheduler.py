@@ -5,15 +5,31 @@ from apscheduler.jobstores.redis import RedisJobStore
 from aiogram import Bot
 from db.models.models import Reminder, RepeatType
 from tortoise import Tortoise
+from bot.utils.get_bot import get_bot   
+
+def singleton(cls):
+    instances = {}
+    
+    def get_instance(*args, **kwargs):
+        if cls not in instances:
+            instances[cls] = cls(*args, **kwargs)
+        return instances[cls]
+    
+    return get_instance
 
 
+
+
+
+
+@singleton
 class ReminderScheduler:
-    def __init__(self, bot: Bot, jobstores=None):
-        self.scheduler = AsyncIOScheduler(jobstores=jobstores)
-        self.bot = bot
+    def __init__(self, jobstores=None):
+        if not hasattr(self, 'scheduler'):
+            self.scheduler = AsyncIOScheduler(jobstores=jobstores)
 
     async def start(self):
-        self.scheduler.start()
+        return self.scheduler.start()
         # При запуске не нужно вручную планировать задачи,
         # так как APScheduler автоматически восстановит их из Redis
 
@@ -22,7 +38,7 @@ class ReminderScheduler:
         
         # Schedule the initial notification
         self.scheduler.add_job(
-            self._send_reminder,
+            send_reminder,
             'date',
             run_date=reminder.remind_at,
             args=[reminder.id],
@@ -48,27 +64,13 @@ class ReminderScheduler:
             return
 
         self.scheduler.add_job(
-            self._send_reminder,
+            send_reminder,
             trigger=trigger,
             args=[reminder.id],
             id=job_id
         )
 
-    async def _send_reminder(self, reminder_id: int):
-        reminder = await Reminder.get_or_none(id=reminder_id)
-        if not reminder or not reminder.is_active:
-            return
-
-        user = await reminder.user
-        await self.bot.send_message(
-            chat_id=user.telegram_id,
-            text=f"⏰ Reminder: {reminder.text}"
-        )
-
-        # If it's a one-time reminder, deactivate it
-        if reminder.repeat == RepeatType.NONE:
-            reminder.is_active = False
-            await reminder.save()
+    
 
     async def remove_reminder(self, reminder_id: int):
         job_id = f"reminder_{reminder_id}"
